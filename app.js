@@ -55,11 +55,22 @@ function seed(){
 function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0)}
 addEventListener('resize',resize);resize();
 const sphere=()=>{const mobile=W<760;const r=Math.min(W,H)*(mobile?.35:.39)*(0.78+state.zoom*.28);return{x:mobile?W*.68:W*.71,y:mobile?H*.38:H*.47,r}};
+const OCEAN_COLORS=Object.freeze({
+  water:'124,203,235',
+  jelly:'196,161,255',
+  fish:'242,206,118',
+  whale:'114,158,255',
+  dolphin:'101,221,208',
+  turtle:'161,213,139',
+  trash:'239,148,126',
+  glass:'205,252,255'
+});
+let drawColor=OCEAN_COLORS.water,drawDepth=0,drawGlow=1;
 const visual={};Object.assign(visual,state);
 let yaw=.32,pitch=.38,slosh=0,sloshV=0,ripple=0,drag=null;
 const innerR=.968,TAU=Math.PI*2;
 function glassSphere(){const mobile=W<760,r=Math.min(W,H)*(mobile?.355:.405)*(0.82+state.zoom*.2);return{x:mobile?W*.66:W*.715,y:mobile?H*.39:H*.47,r}}
-function palette(){const clean=visual.purity;return{line:clean>.45?'87,229,239':'190,166,125',fg:clean>.45?'205,252,255':'236,211,171',bg:clean>.45?'3,19,27':'25,27,25'}}
+function palette(){const clean=visual.purity;return{line:OCEAN_COLORS.water,fg:OCEAN_COLORS.glass,bg:clean>.45?'3,19,27':'25,27,25'}}
 function project(x,y,z,s){const X=x*Math.cos(yaw)+z*Math.sin(yaw),Z=-x*Math.sin(yaw)+z*Math.cos(yaw);return{x:s.x+X*s.r,y:s.y+(Z*Math.sin(pitch)-y*Math.cos(pitch))*s.r,z:Z*Math.cos(pitch)+y*Math.sin(pitch)}}
 function edgeHeight(ang){const amp=visual.wave,crest=Math.pow((1+Math.cos(ang-t*.66))*.5,8);return Math.max(-.7,Math.min(.5,-.15+amp*(.2*Math.sin(ang+t*.86)+.11*Math.sin(2*ang-t*1.17)+.065*Math.sin(3*ang+t*.57)+.24*(crest-.196))+slosh*Math.cos(ang-yaw)+ripple*.1*Math.sin(3*ang-t*3.7)))}
 function surfacePoint(u,v){const rr0=Math.min(1,Math.hypot(u,v)),ang=Math.atan2(v,u),edge=edgeHeight(ang),swirl=visual.current*.32*(1-rr0*rr0)*Math.sin(t*.24),aa0=ang+swirl,x0=Math.cos(aa0)*rr0,z0=Math.sin(aa0)*rr0,w=(Math.sin(x0*5.1+t*1.32)*.105+Math.cos(z0*6.2-t*.92)*.06+Math.sin((x0-z0)*9+t*.74)*.026)*visual.wave;let y=-.15+(edge+.15)*rr0*rr0+w*(1-rr0)+ripple*.14*Math.sin(rr0*17-t*5)*(1-rr0),rr=rr0*Math.sqrt(Math.max(0,innerR*innerR-edge*edge));y=Math.max(-.76,Math.min(.56,y));const warp=.032*Math.sin(ang*3+t*.7+rr0*7)*(1-rr0)*rr0*visual.current,aa=ang+warp,limit=Math.sqrt(Math.max(0,innerR*innerR-y*y));rr=Math.min(rr,limit);return{x:rr*Math.cos(aa),y,z:rr*Math.sin(aa)}}
@@ -71,10 +82,10 @@ const forms={
  bottle:new Path2D('M -.15 -.70 L .15 -.70 L .15 -.45 Q .34 -.34 .34 -.15 L .34 .60 Q 0 .73 -.34 .60 L -.34 -.15 Q -.34 -.34 -.15 -.45 Z'),
  bag:new Path2D('M -.48 -.38 L -.43 -.76 L -.19 -.76 L -.14 -.39 Q .02 -.32 .18 -.40 L .24 -.76 L .46 -.71 L .42 -.31 Q .65 .10 .44 .61 Q .05 .75 -.48 .53 Q -.62 .04 -.48 -.38 Z')
 };
-function lineColor(alpha=1){const p=palette();return'rgba('+p.line+','+alpha+')'}
-function ink(path,alpha=.85,fill=true){if(fill){ctx.fillStyle='rgba('+palette().bg+','+(alpha*.74)+')';ctx.fill(path);ctx.fillStyle=lineColor(.055);ctx.fill(path)}ctx.strokeStyle=lineColor(alpha);ctx.stroke(path)}
+function lineColor(alpha=1){const depthFade=.48+.52*Math.max(0,Math.min(1,(drawDepth+1)/2)),a=Math.min(1,alpha*depthFade*drawGlow);return'rgba('+drawColor+','+a+')'}
+function ink(path,alpha=.85,fill=true){if(fill){ctx.fillStyle='rgba('+drawColor+','+(alpha*.06*drawGlow)+')';ctx.fill(path)}ctx.shadowColor='rgba('+drawColor+','+(.22*drawGlow)+')';ctx.shadowBlur=4*drawGlow;ctx.strokeStyle=lineColor(alpha);ctx.stroke(path);ctx.shadowBlur=0}
 function stroke(path,alpha=.6){ctx.strokeStyle=lineColor(alpha);ctx.stroke(new Path2D(path))}
-function eye(x,y,r=.018){ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fillStyle='rgba('+palette().fg+',.9)';ctx.fill()}
+function eye(x,y,r=.018){ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fillStyle='rgba('+drawColor+','+(.82*drawGlow)+')';ctx.fill()}
 function whaleShape(ph){ctx.rotate(Math.sin(ph)*.035);ink(forms.whale);stroke('M -.28 .10 Q -.01 .18 .02 .51 Q .23 .47 .31 .24',.75);for(let j=0;j<5;j++)stroke('M -.49 '+(.02+j*.03)+' Q .25 '+(.1+j*.03)+' .85 '+(.01+j*.02),.25+j*.05);stroke('M -.20 -.24 Q -.12 -.43 .04 -.32',.6);eye(.73,-.04);ctx.save();ctx.translate(-.82,0);ctx.rotate(Math.sin(ph)*.16);stroke('M -.22 -.17 Q -.04 -.04 .04 0 Q -.04 .06 -.22 .19',.72);ctx.restore()}
 function dolphinShape(ph){ctx.rotate(Math.sin(ph)*.06);ink(forms.dolphin,.9);stroke('M -.66 .06 Q .06 -.02 .70 -.09',.4);stroke('M -.15 .14 Q -.10 .30 .11 .39',.7);eye(.58,-.11)}
 function turtleShape(ph){const flap=Math.sin(ph)*.2;for(const side of[-1,1]){ctx.save();ctx.scale(1,side);ctx.rotate(flap*side*.28);ink(new Path2D('M .24 -.34 Q .29 -.76 -.18 -.99 Q -.40 -.76 -.13 -.37 Z'),.65);ink(new Path2D('M -.45 -.28 Q -.84 -.63 -.83 -.26 L -.55 -.08 Z'),.55);ctx.restore()}ink(new Path2D('M .45 -.15 Q .99 -.23 .98 .01 Q .94 .24 .46 .15 Z'),.85);ctx.beginPath();ctx.ellipse(-.05,0,.64,.43,0,0,TAU);ctx.fillStyle='rgba('+palette().bg+',.85)';ctx.fill();ctx.strokeStyle=lineColor(.9);ctx.stroke();stroke('M -.40 -.16 L -.12 -.28 L .19 -.18 L .26 .07 L -.01 .26 L -.31 .14 Z M -.12 -.28 L -.11 -.42 M .19 -.18 L .48 -.25 M .26 .07 L .57 .13 M -.01 .26 L -.03 .42 M -.31 .14 L -.53 .28',.65);eye(.81,-.06,.025)}
@@ -88,10 +99,10 @@ function residents(s){const o=[],add=(kind,x,y,z,size,ph,ang=0,type='')=>{const 
  const jc=Math.max(0,Math.round(visual.jellies*5));for(let i=0;i<jc;i++)add('jelly',-.58+i*.21+.025*Math.sin(t*.35+i),-.4+.05*(i%2)+.03*Math.sin(t*1.2+i),.08-.12*i,.07+(i%2)*.025,t+i,i*.06);
  const fc=Math.round(visual.fish*30);for(let i=0;i<fc;i++){const row=Math.floor(i/7),col=i%7,ph=t*4+i*.72;add('fish',-.42+col*.1-row*.025+.018*Math.sin(i*2.7)+.07*Math.sin(t*.55+row),-.69+row*.065+.014*Math.cos(i*1.7),.18-row*.05,.021+(i%3)*.004,ph,.08*Math.sin(t+col))}
  const tc=Math.round(visual.trash*8);for(let i=0;i<tc;i++)add('trash',.5-.15*(i%3)+.025*Math.sin(t*.3+i),-.46-.09*Math.floor(i/3)+.025*Math.sin(t*.7+i),.12-.08*i,.052,t+i,i*.25,i%2?'bag':'bottle');
- o.sort((a,b)=>a.p.z-b.p.z);for(const x of o){ctx.save();ctx.translate(x.p.x,x.p.y);ctx.rotate(x.ang);const sc=x.size*s.r;ctx.scale(sc,sc);ctx.lineWidth=Math.max(.009,.85/sc);ctx.lineJoin='round';ctx.lineCap='round';if(x.kind==='whale')whaleShape(x.ph);else if(x.kind==='dolphin')dolphinShape(x.ph);else if(x.kind==='turtle')turtleShape(x.ph);else if(x.kind==='jelly')jellyShape(x.ph);else if(x.kind==='trash')trashShape(x.type,x.ph);else{ctx.rotate(Math.sin(x.ph)*.07);ink(forms.fish,.72);eye(.45,-.015,.04)}ctx.restore()}}
+ o.sort((a,b)=>a.p.z-b.p.z);for(const x of o){drawColor=OCEAN_COLORS[x.kind]||OCEAN_COLORS.fish;drawDepth=x.p.z;drawGlow=x.kind==='trash'?.48:.8;ctx.save();ctx.translate(x.p.x,x.p.y);ctx.rotate(x.ang);const sc=x.size*s.r;ctx.scale(sc,sc);ctx.lineWidth=Math.max(.009,.85/sc);ctx.lineJoin='round';ctx.lineCap='round';if(x.kind==='whale')whaleShape(x.ph);else if(x.kind==='dolphin')dolphinShape(x.ph);else if(x.kind==='turtle')turtleShape(x.ph);else if(x.kind==='jelly')jellyShape(x.ph);else if(x.kind==='trash')trashShape(x.type,x.ph);else{ctx.rotate(Math.sin(x.ph)*.07);ink(forms.fish,.72);eye(.45,-.015,.04)}ctx.restore()}drawColor=OCEAN_COLORS.water;drawDepth=0;drawGlow=1}
 const seeds=Array.from({length:90},(_,i)=>({a:i*2.399963,r:Math.sqrt((i+.5)/90)*.88,p:i*1.719}));
 function bg(){const g=ctx.createRadialGradient(W*.7,H*.45,10,W*.7,H*.45,Math.max(W,H)*.8);g.addColorStop(0,visual.purity>.45?'#062d38':'#262a27');g.addColorStop(.55,'#03151d');g.addColorStop(1,'#01080d');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
-function draw(){requestAnimationFrame(draw);const now=performance.now(),dt=Math.min((now-last)/1000,.04);last=now;if(state.playing)t+=dt*(.22+state.speed*1.5);for(const k of['depth','current','purity','jellies','fish','large','trash','life','wave','light','zoom'])visual[k]+=(state[k]-visual[k])*(1-Math.exp(-dt*7));ripple*=Math.exp(-dt*.9);sloshV+=(-slosh*7-sloshV*2)*dt;slosh+=sloshV*dt;bg();const s=glassSphere();ctx.save();ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,TAU);ctx.clip();
+function draw(){requestAnimationFrame(draw);drawColor=OCEAN_COLORS.water;drawDepth=0;drawGlow=1;const now=performance.now(),dt=Math.min((now-last)/1000,.04);last=now;if(state.playing)t+=dt*(.22+state.speed*1.5);for(const k of['depth','current','purity','jellies','fish','large','trash','life','wave','light','zoom'])visual[k]+=(state[k]-visual[k])*(1-Math.exp(-dt*7));ripple*=Math.exp(-dt*.9);sloshV+=(-slosh*7-sloshV*2)*dt;slosh+=sloshV*dt;bg();const s=glassSphere();ctx.save();ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,TAU);ctx.clip();
  const p=palette(),halo=ctx.createRadialGradient(s.x-s.r*.18,s.y+s.r*.3,0,s.x,s.y,s.r);halo.addColorStop(0,'rgba('+p.line+',.09)');halo.addColorStop(1,'rgba('+p.bg+',.85)');ctx.fillStyle=halo;ctx.fillRect(s.x-s.r,s.y-s.r,s.r*2,s.r*2);
  const contours=front=>{for(let j=0;j<25;j++){const f=.06+j*.93/24;ctx.beginPath();let pen=false;for(let i=0;i<=120;i++){const ang=i*TAU/120,q=project(...Object.values(volumePoint(f,ang)),s),near=Math.sin(ang-yaw)>0;if(near!==front){pen=false;continue}pen?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);pen=true}ctx.strokeStyle=lineColor(front?.08+.18*f:.04);ctx.lineWidth=front?.7:.45;ctx.stroke()}};
  contours(false);
