@@ -28,15 +28,16 @@ function createAudio(){
     o.connect(fl).connect(g).connect(dest);o.start(start);o.stop(start+duration+.1);return o
   };
   const timer=setInterval(()=>{const now=A.currentTime;
-    if(now>=nextChord){const chord=chords[chordIndex%chords.length];chord.forEach((hz,i)=>{voice(pad,hz,now,8.5,i%2?'sine':'triangle',.032,i*3-4);voice(pad,hz/2,now,8.5,'sine',.015,5-i*2)});chordIndex++;nextChord=now+7.8}
-    if(now>=nextBell){const chord=chords[(chordIndex-1+chords.length)%chords.length],hz=chord[Math.floor(Math.random()*chord.length)]*[2,3,4][Math.floor(Math.random()*3)];voice(bell,hz,now,2.4,'sine',.07);voice(bell,hz*2.01,now,1.3,'sine',.018);nextBell=now+rnd(.8,2.2)}
+    if(now>=nextChord){const chord=chords[chordIndex%chords.length];chord.forEach((hz,i)=>{voice(pad,hz,now,8.5,i%2?'sine':'triangle',.068,i*3-4);voice(pad,hz/2,now,8.5,'sine',.028,5-i*2)});chordIndex++;nextChord=now+7.8}
+    if(now>=nextBell){const chord=chords[(chordIndex-1+chords.length)%chords.length],hz=chord[Math.floor(Math.random()*chord.length)]*[2,3,4][Math.floor(Math.random()*3)];voice(bell,hz,now,2.4,'sine',.13);voice(bell,hz*2.01,now,1.3,'sine',.032);nextBell=now+rnd(.8,2.2)}
     if(now>=nextBubble){const pan=A.createStereoPanner(),g=A.createGain(),o=A.createOscillator();pan.pan.value=rnd(-.8,.8);o.type='sine';o.frequency.setValueAtTime(rnd(540,920),now);o.frequency.exponentialRampToValueAtTime(rnd(1250,1900),now+.11);g.gain.setValueAtTime(.001,now);g.gain.exponentialRampToValueAtTime(.1,now+.018);g.gain.exponentialRampToValueAtTime(.001,now+.17);o.connect(g).connect(pan).connect(bubble);o.start(now);o.stop(now+.2);nextBubble=now+rnd(.28,.95)}
-    if(now>=nextWhale){const o=voice(whales,rnd(88,118),now,5.8,'sine',.11),v=A.createOscillator(),vg=A.createGain();v.frequency.value=rnd(.25,.5);vg.gain.value=7;v.connect(vg).connect(o.frequency);v.start(now);v.stop(now+5.9);nextWhale=now+rnd(9,16)}
-    if(now>=nextBass){const root=chords[(chordIndex-1+chords.length)%chords.length][0]/2;voice(deep,root,now,7.5,'sine',.055);voice(deep,root*2,now,7.5,'triangle',.012);nextBass=now+7.8}
+    if(now>=nextWhale){const o=voice(whales,rnd(88,118),now,5.8,'sine',.19),v=A.createOscillator(),vg=A.createGain();v.frequency.value=rnd(.25,.5);vg.gain.value=7;v.connect(vg).connect(o.frequency);v.start(now);v.stop(now+5.9);nextWhale=now+rnd(9,16)}
+    if(now>=nextBass){const root=chords[(chordIndex-1+chords.length)%chords.length][0]/2;voice(deep,root,now,7.5,'sine',.095);voice(deep,root*2,now,7.5,'triangle',.024);nextBass=now+7.8}
     const data=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(data);audioPulse=data.reduce((s,v)=>s+v,0)/(data.length*255);
   },90);
   audio={A,master,tracks,waveFilter:waveNoise.fl,currentFilter:currentNoise.fl,analyser,timer};mixAudio();return audio;
 }
+function mixAudio(){if(!audio)return;const now=audio.A.currentTime,active=state.playing?1:0;audio.master.gain.setTargetAtTime(state.master*.82*active,now,.22);['pad','waves','bell','whales','bubblesTrack','currentTrack','deepBass'].forEach(k=>audio.tracks[k].gain.setTargetAtTime(Math.max(.001,state[k]),now,.25));audio.waveFilter.frequency.setTargetAtTime(240+state.waves*1050,now,.3);audio.currentFilter.frequency.setTargetAtTime(520+state.current*1700,now,.25)}
 async function startAudio(){createAudio();if(audio.A.state==='suspended')await audio.A.resume();mixAudio()}
 function seed(){
   creatures.fish=Array.from({length:72},(_,i)=>({x:rnd(-.82,.82),y:rnd(-.65,.65),z:rnd(.2,1),s:rnd(.12,.3),phase:rnd(0,9),color:['#7ff6ff','#ffc978','#ef8dcc','#a8ffcf','#a6b7ff','#ffffff'][i%6]}));
@@ -132,6 +133,8 @@ controls.addEventListener('input',e=>{if(e.target.matches('input'))setValue(e.ta
 function toast(icon,msg){const el=document.querySelector('#toast');el.querySelector('span').textContent=icon;el.querySelector('p').textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600)}
 function event(name){const act={whale:()=>{creatures.large[0].x=-.72;setValue('large',1);toast('🐋','鯨魚從透明球深處緩緩游過')},dolphin:()=>{creatures.large[1].x=-.72;setValue('large',1);toast('🐬','海豚快速穿越洋流')},jelly:()=>{setValue('jellies',1);toast('🪼','大量發光水母正在浮起')},turtle:()=>{creatures.large[2].x=-.72;setValue('large',1);toast('🐢','海龜回到乾淨的棲地')},pollution:()=>{setValue('trash',1);setValue('purity',.18);toast('🗑️','垃圾增加，海水開始混濁')},current:()=>{setValue('current',1);setValue('wave',1);toast('🌊','強烈洋流席捲整顆星球')},deep:()=>{state.deep=!state.deep;setValue('light',state.deep?.05:.7);toast('🌑',state.deep?'進入深海微光模式':'返回明亮海面')},clean:()=>{setValue('trash',0);setValue('purity',1);setValue('life',1);toast('✨','污染消退，海洋生命重新復甦')},play:()=>{state.playing=true;startAudio();mixAudio();toast('▶','星球與夢幻聲景開始呼吸')},stop:()=>{state.playing=false;mixAudio();toast('■','海洋與聲景慢慢靜止')},record:()=>{setValue('trash',1);setValue('purity',.05);setValue('life',.12);toast('●','人類污染入侵，生態進入危急狀態')}};if(act[name])act[name]()}
 document.querySelectorAll('[data-event]').forEach(b=>b.onclick=()=>event(b.dataset.event));
+const soundBtn=document.querySelector('#soundBtn');
+soundBtn.onclick=async()=>{try{await startAudio();state.playing=true;mixAudio();soundBtn.classList.add('active');soundBtn.querySelector('span').textContent='聲景播放中';toast('♫','夢幻海洋聲景已啟動')}catch(e){console.error(e);toast('⚠️','聲音啟動失敗，請確認瀏覽器音量與分頁靜音設定')}};
 document.querySelector('#enterBtn').onclick=()=>document.querySelector('#panel').classList.add('open');
 document.querySelector('#closePanel').onclick=()=>document.querySelector('#panel').classList.remove('open');
 document.querySelector('#storyBtn').onclick=()=>document.querySelector('#concept').classList.add('open');
