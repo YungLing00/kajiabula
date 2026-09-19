@@ -25,7 +25,7 @@ function createAudio(){
   const lfo=A.createOscillator(),lfoGain=A.createGain();lfo.frequency.value=.08;lfoGain.gain.value=260;lfo.connect(lfoGain).connect(waveNoise.fl.frequency);lfo.start();
   const delay=A.createDelay(2),feedback=A.createGain(),delayWet=A.createGain();delay.delayTime.value=.42;feedback.gain.value=.42;delayWet.gain.value=.32;bell.connect(delay);delay.connect(feedback).connect(delay);delay.connect(delayWet).connect(reverb);
   const chords=[[146.83,220,277.18,369.99],[123.47,185,246.94,329.63],[98,146.83,196,293.66],[110,164.81,220,277.18]];
-  let chordIndex=0,nextChord=0,nextBell=0,nextBubble=0,nextWhale=0,nextDolphin=0,nextSwim=0,nextBass=0;
+  let chordIndex=0,nextChord=0,nextBell=0,nextBubble=0,nextWhale=0,nextDolphin=0,nextSwim=0,nextLifeTone=0,nextBass=0,lifeStep=0;
   const voice=(dest,freq,start,duration,type='sine',level=.08,detune=0)=>{
     const o=A.createOscillator(),g=A.createGain(),fl=A.createBiquadFilter();o.type=type;o.frequency.value=freq;o.detune.value=detune;fl.type='lowpass';fl.frequency.value=1350;fl.Q.value=.3;
     g.gain.setValueAtTime(.0001,start);g.gain.exponentialRampToValueAtTime(level,start+Math.min(.9,duration*.25));g.gain.exponentialRampToValueAtTime(.0001,start+duration);
@@ -38,12 +38,19 @@ function createAudio(){
     if(now>=nextWhale){const o=voice(whales,rnd(88,118),now,5.8,'sine',.19),v=A.createOscillator(),vg=A.createGain();v.frequency.value=rnd(.25,.5);vg.gain.value=7;v.connect(vg).connect(o.frequency);v.start(now);v.stop(now+5.9);nextWhale=now+rnd(9,16)}
     if(now>=nextDolphin){const chirps=Math.floor(rnd(2,4));for(let i=0;i<chirps;i++){const st=now+i*.13,o=A.createOscillator(),g=A.createGain(),pan=A.createStereoPanner();o.type='sine';o.frequency.setValueAtTime(rnd(1150,1650),st);o.frequency.exponentialRampToValueAtTime(rnd(2450,3400),st+.075);o.frequency.exponentialRampToValueAtTime(rnd(1500,2100),st+.16);g.gain.setValueAtTime(.001,st);g.gain.exponentialRampToValueAtTime(.075,st+.018);g.gain.exponentialRampToValueAtTime(.001,st+.19);pan.pan.value=rnd(-.65,.65);o.connect(g).connect(pan).connect(whales);o.start(st);o.stop(st+.21)}nextDolphin=now+rnd(5.5,10)}
     if(now>=nextSwim){const src=A.createBufferSource(),fl=A.createBiquadFilter(),g=A.createGain(),pan=A.createStereoPanner();src.buffer=noiseBuffer;fl.type='bandpass';fl.frequency.setValueAtTime(rnd(480,760),now);fl.frequency.exponentialRampToValueAtTime(rnd(1100,1700),now+.48);fl.Q.value=.7;pan.pan.value=rnd(-.75,.75);g.gain.setValueAtTime(.001,now);g.gain.exponentialRampToValueAtTime(.045,now+.12);g.gain.exponentialRampToValueAtTime(.001,now+.72);src.connect(fl).connect(g).connect(pan).connect(current);src.start(now,rnd(0,4));src.stop(now+.75);nextSwim=now+rnd(1.8,4.6)}
+    if(now>=nextLifeTone){
+      const density=Math.min(1,state.fish*.42+state.jellies*.33+state.large*.25),scale=[0,3,5,7,10],note=scale[lifeStep%scale.length],base=55*Math.pow(2,note/12),octave=state.jellies>.65?4:state.fish>.55?3:2,hz=base*octave;
+      const destination=state.large>.72?whales:state.jellies>.48?bell:pad,duration=state.jellies>.55?2.8:1.7,level=.018+density*.047;
+      voice(destination,hz,now,duration,'sine',level,rnd(-5,5));voice(destination,hz*1.5,now+.08,duration*.72,'sine',level*.24,rnd(-4,4));
+      if(state.fish>.45&&lifeStep%2===0)voice(bell,hz*2,now+.22,.9,'triangle',level*.32);
+      lifeStep++;nextLifeTone=now+Math.max(.42,2.3-density*1.55+state.chill*.45);
+    }
     if(now>=nextBass){const root=chords[(chordIndex-1+chords.length)%chords.length][0]/2;voice(deep,root,now,7.5,'sine',.095);voice(deep,root*2,now,7.5,'triangle',.024);nextBass=now+7.8}
     const data=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(data);audioPulse=data.reduce((s,v)=>s+v,0)/(data.length*255);
   },90);
-  audio={A,master,tracks,waveFilter:waveNoise.fl,currentFilter:currentNoise.fl,analyser,timer};mixAudio();return audio;
+  audio={A,master,tracks,waveFilter:waveNoise.fl,currentFilter:currentNoise.fl,reverbWet:wet,analyser,timer};mixAudio();return audio;
 }
-function mixAudio(){if(audio){const now=audio.A.currentTime,active=state.playing?1:0;audio.master.gain.setTargetAtTime(state.master*.82*active,now,.22);['pad','waves','bell','whales','bubblesTrack','currentTrack','deepBass'].forEach(k=>audio.tracks[k].gain.setTargetAtTime(Math.max(.001,state[k]),now,.25));audio.waveFilter.frequency.setTargetAtTime(240+state.waves*1050,now,.3);audio.currentFilter.frequency.setTargetAtTime(520+state.current*1700,now,.25)}if(ytReady&&ytPlayer){ytPlayer.setVolume(Math.round(state.master*32));if(!state.playing)ytPlayer.pauseVideo()}}
+function mixAudio(){if(audio){const now=audio.A.currentTime,active=state.playing?1:0,depth=Math.max(0,Math.min(1,state.depth)),life=Math.max(0,Math.min(1,state.life));audio.master.gain.setTargetAtTime(state.master*.82*active,now,.22);['pad','bell','whales','bubblesTrack','currentTrack'].forEach(k=>audio.tracks[k].gain.setTargetAtTime(Math.max(.001,state[k]),now,.25));audio.tracks.waves.gain.setTargetAtTime(Math.max(.2,state.waves)*(.82+.18*depth),now,.35);audio.tracks.deepBass.gain.setTargetAtTime(Math.max(.08,state.deepBass)*(1+depth*.55),now,.4);audio.waveFilter.frequency.setTargetAtTime(260+(1-depth)*720+state.waves*340,now,.45);audio.currentFilter.frequency.setTargetAtTime(390+(1-depth)*620+state.current*900,now,.4);audio.reverbWet.gain.setTargetAtTime(.34+depth*.26+life*.08,now,.6)}if(ytReady&&ytPlayer){ytPlayer.setVolume(Math.round(state.master*32));if(!state.playing)ytPlayer.pauseVideo()}}
 async function startAudio(){createAudio();if(audio.A.state==='suspended')await audio.A.resume();state.playing=true;startBackgroundMusic();mixAudio()}
 async function playSplash(strength=1){
   await startAudio();const A=audio.A,now=A.currentTime,duration=.55,buffer=A.createBuffer(1,Math.ceil(A.sampleRate*duration),A.sampleRate),data=buffer.getChannelData(0);
