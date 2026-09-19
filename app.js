@@ -1,37 +1,94 @@
-import * as THREE from 'three';
-const canvas=document.querySelector('#ocean'),scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x03151d,.027);
-const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,100),renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
-camera.position.set(0,0,14);scene.add(new THREE.AmbientLight(0x4bc4db,1.5));const sun=new THREE.DirectionalLight(0xd9fcff,3);sun.position.set(5,6,7);scene.add(sun);
-const world=new THREE.Group();world.position.x=2.6;scene.add(world);
-const state={depth:.78,current:.35,purity:.78,jellies:.35,fish:.6,large:.55,trash:.2,life:.78,wave:.3,speed:.45,light:.7,sound:.35,chill:.7,rotX:.5,rotY:.5,zoom:.55,playing:true,deep:false};
-const oceanMat=new THREE.MeshPhysicalMaterial({color:0x08758e,transparent:true,opacity:.48,roughness:.12,metalness:.05,transmission:.35,thickness:1.5,clearcoat:1});
-const ocean=new THREE.Mesh(new THREE.SphereGeometry(3.12,64,64),oceanMat);world.add(ocean);
-const shell=new THREE.Mesh(new THREE.SphereGeometry(3.28,64,64),new THREE.MeshPhysicalMaterial({color:0x9cecff,transparent:true,opacity:.09,roughness:0,transmission:.95,thickness:.2,side:THREE.DoubleSide}));world.add(shell);
-const glow=new THREE.Mesh(new THREE.SphereGeometry(3.42,32,32),new THREE.MeshBasicMaterial({color:0x1bcce7,transparent:true,opacity:.035,side:THREE.BackSide}));world.add(glow);
-const particles=new THREE.BufferGeometry(),pts=[];for(let i=0;i<900;i++){const r=3.5+Math.random()*9,a=Math.random()*Math.PI*2,b=Math.acos(2*Math.random()-1);pts.push(r*Math.sin(b)*Math.cos(a),r*Math.sin(b)*Math.sin(a),r*Math.cos(b))}particles.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));scene.add(new THREE.Points(particles,new THREE.PointsMaterial({color:0x74dceb,size:.018,transparent:true,opacity:.4})));
-const creatures={fish:[],jelly:[],large:[],trash:[]};
-function mat(color,opacity=1){return new THREE.MeshStandardMaterial({color,transparent:opacity<1,opacity,roughness:.5})}
-function randomPos(r=2.5){const v=new THREE.Vector3().randomDirection().multiplyScalar(Math.cbrt(Math.random())*r);return v}
-function addFish(i){const g=new THREE.Group(),body=new THREE.Mesh(new THREE.SphereGeometry(.08,.12?8:8,6),mat(i%4?0x8adfe9:0xffc979));body.scale.set(1.8,.7,.65);g.add(body);const tail=new THREE.Mesh(new THREE.ConeGeometry(.08,.18,3),body.material);tail.rotation.z=-Math.PI/2;tail.position.x=-.18;g.add(tail);g.position.copy(randomPos());g.userData={phase:Math.random()*9,s:.2+Math.random()*.25};world.add(g);creatures.fish.push(g)}
-function addJelly(){const g=new THREE.Group(),head=new THREE.Mesh(new THREE.SphereGeometry(.14,12,8,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0xa7f4ff,transparent:true,opacity:.65}));g.add(head);for(let i=0;i<3;i++){const t=new THREE.Mesh(new THREE.CylinderGeometry(.008,.004,.28,4),head.material);t.position.set((i-1)*.05,-.14,0);g.add(t)}g.position.copy(randomPos(2.6));g.userData={phase:Math.random()*9};world.add(g);creatures.jelly.push(g)}
-function addLarge(type='whale'){const g=new THREE.Group(),color=type==='turtle'?0x5bb89a:0x5d9dac,body=new THREE.Mesh(new THREE.SphereGeometry(.3,16,10),mat(color));body.scale.set(type==='turtle'?1.2:3,type==='turtle'?.35:.65,1);g.add(body);const tail=new THREE.Mesh(new THREE.ConeGeometry(.22,.38,3),body.material);tail.rotation.z=-Math.PI/2;tail.position.x=-.85;g.add(tail);g.position.copy(randomPos(2));g.scale.setScalar(type==='dolphin'?.55:type==='turtle'?.65:1);g.userData={phase:Math.random()*9,type};world.add(g);creatures.large.push(g);return g}
-function addTrash(){const mesh=new THREE.Mesh(Math.random()>.5?new THREE.BoxGeometry(.1,.18,.06):new THREE.CylinderGeometry(.05,.05,.2,7),mat(Math.random()>.5?0xeae3c4:0xd65f66,.85));mesh.position.copy(randomPos());mesh.rotation.set(Math.random()*3,Math.random()*3,0);mesh.userData={phase:Math.random()*9};world.add(mesh);creatures.trash.push(mesh)}
-for(let i=0;i<80;i++)addFish(i);for(let i=0;i<36;i++)addJelly();for(let i=0;i<3;i++)addLarge(i===1?'dolphin':i===2?'turtle':'whale');for(let i=0;i<45;i++)addTrash();
+const canvas=document.querySelector('#ocean');
+const ctx=canvas.getContext('2d',{alpha:false});
+const state={depth:.78,current:.35,purity:.78,jellies:.5,fish:.7,large:.75,trash:.18,life:.78,rotX:.5,rotY:.5,zoom:.55,wave:.3,speed:.45,light:.7,sound:.35,chill:.7,playing:true,deep:false};
+let W=0,H=0,DPR=1,t=0,last=performance.now(),mouseX=0,mouseY=0,toastTimer;
+const creatures={fish:[],jelly:[],trash:[],bubbles:[],large:[]};
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function seed(){
+  creatures.fish=Array.from({length:72},(_,i)=>({x:rnd(-.82,.82),y:rnd(-.65,.65),z:rnd(.2,1),s:rnd(.12,.3),phase:rnd(0,9),color:i%5===0?'#ffc978':'#74e8ee'}));
+  creatures.jelly=Array.from({length:28},()=>({x:rnd(-.8,.8),y:rnd(-.7,.65),z:rnd(.25,1),s:rnd(.5,1.15),phase:rnd(0,9)}));
+  creatures.trash=Array.from({length:36},(_,i)=>({x:rnd(-.78,.78),y:rnd(-.65,.68),z:rnd(.3,1),phase:rnd(0,9),kind:i%3}));
+  creatures.bubbles=Array.from({length:90},()=>({x:rnd(-.92,.92),y:rnd(-.9,.9),r:rnd(1,4),s:rnd(.03,.12),phase:rnd(0,9)}));
+  creatures.large=[
+    {type:'whale',x:-.35,y:.16,z:.9,s:.055,phase:1},
+    {type:'dolphin',x:.35,y:-.18,z:.7,s:.11,phase:3},
+    {type:'turtle',x:.12,y:.43,z:.62,s:.065,phase:5}
+  ];
+}seed();
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener('resize',resize);resize();
+const sphere=()=>{const mobile=W<760;const r=Math.min(W,H)*(mobile?.35:.39)*(0.78+state.zoom*.28);return{x:mobile?W*.68:W*.71,y:mobile?H*.38:H*.47,r}};
+function bg(){
+  const healthy=state.purity*(1-state.trash);
+  const g=ctx.createRadialGradient(W*.7,H*.45,20,W*.7,H*.45,Math.max(W,H)*.75);
+  g.addColorStop(0,state.deep?'#03131d':healthy>.45?'#063948':'#25322d');g.addColorStop(.45,state.deep?'#020b13':'#041b25');g.addColorStop(1,'#01080d');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha=.16+.2*state.light;
+  for(let i=0;i<5;i++){const y=H*(.16+i*.16)+Math.sin(t*.6+i)*25;const ag=ctx.createLinearGradient(0,y,W,y+80);ag.addColorStop(0,'transparent');ag.addColorStop(.55,state.purity>.5?'#0e7180':'#6a493b');ag.addColorStop(1,'transparent');ctx.fillStyle=ag;ctx.fillRect(0,y,W,110)}
+  ctx.globalAlpha=1;
+}
+function clipSphere(s){ctx.save();ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.clip()}
+function drawWater(s){
+  const health=state.purity*(1-state.trash);
+  const water=ctx.createRadialGradient(s.x-s.r*.28,s.y-s.r*.3,s.r*.08,s.x,s.y,s.r);
+  water.addColorStop(0,state.deep?'#0b455d':health>.4?'#179cb0':'#706049');water.addColorStop(.55,state.deep?'#062b3e':health>.4?'#07596f':'#3d4640');water.addColorStop(1,'#021621');
+  ctx.fillStyle=water;ctx.fillRect(s.x-s.r,s.y-s.r,s.r*2,s.r*2);
+  const waterTop=s.y+s.r*(1-state.depth*2);
+  ctx.globalAlpha=.22+.18*state.wave;ctx.strokeStyle='#b5f8ff';ctx.lineWidth=1.5;
+  for(let j=0;j<7;j++){ctx.beginPath();for(let x=-s.r;x<=s.r;x+=12){const y=waterTop+j*18+Math.sin(x*.027+t*(1.5+state.current*3)+j)*7*state.wave+(x*x/(s.r*s.r))*j*2;if(x===-s.r)ctx.moveTo(s.x+x,y);else ctx.lineTo(s.x+x,y)}ctx.stroke()}
+  ctx.globalAlpha=1;
+}
+function inside(s,x,y,z=1){return[s.x+x*s.r*.92,s.y+y*s.r*.86,z]}
+function fish(s,f,i){
+  const [x,y]=inside(s,f.x,f.y);const sc=(.35+f.z*.75)*s.r/300;ctx.save();ctx.translate(x,y+Math.sin(t*2+f.phase)*4);ctx.scale(sc,sc);ctx.fillStyle=f.color;ctx.globalAlpha=.48+f.z*.4;ctx.beginPath();ctx.ellipse(0,0,14,6,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.moveTo(-11,0);ctx.lineTo(-22,-9);ctx.lineTo(-20,9);ctx.closePath();ctx.fill();ctx.fillStyle='#efffff';ctx.beginPath();ctx.arc(7,-1,1.4,0,7);ctx.fill();ctx.restore();
+}
+function jelly(s,j){
+  const [x,y]=inside(s,j.x,j.y);const sc=j.s*s.r/330;ctx.save();ctx.translate(x,y+Math.sin(t*1.4+j.phase)*7);ctx.scale(sc,sc);ctx.globalAlpha=.38+.25*state.life;ctx.shadowColor='#91f8ff';ctx.shadowBlur=14;const g=ctx.createLinearGradient(0,-18,0,10);g.addColorStop(0,'#e9ffff');g.addColorStop(1,'#62dfe6');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,18,Math.PI,Math.PI*2);ctx.quadraticCurveTo(12,12,0,6);ctx.quadraticCurveTo(-12,12,-18,0);ctx.fill();ctx.strokeStyle='#bfffff';ctx.lineWidth=1.4;for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(k*6,6);ctx.bezierCurveTo(k*7+Math.sin(t*3+j.phase)*5,18,k*5-Math.sin(t*2+j.phase)*7,27,k*6,38);ctx.stroke()}ctx.restore();
+}
+function whale(s,o){
+  const [x,y]=inside(s,o.x,o.y);const sc=s.r/370*(o.type==='whale'?1:o.type==='dolphin'?.62:.55);ctx.save();ctx.translate(x,y+Math.sin(t+o.phase)*9);ctx.scale(sc,sc);ctx.globalAlpha=.84;
+  if(o.type==='turtle'){ctx.fillStyle='#70c6a7';ctx.beginPath();ctx.ellipse(0,0,28,18,0,0,7);ctx.fill();for(const [a,b] of [[-29,-16],[-29,16],[25,-15],[25,15]]){ctx.beginPath();ctx.ellipse(a,b,14,5,b<0?-.55:.55,0,7);ctx.fill()}ctx.beginPath();ctx.arc(31,0,7,0,7);ctx.fill()}
+  else{ctx.fillStyle=o.type==='whale'?'#63aebe':'#8ad9e2';ctx.beginPath();ctx.moveTo(-42,0);ctx.bezierCurveTo(-15,-24,32,-18,48,0);ctx.bezierCurveTo(30,17,-18,19,-42,0);ctx.fill();ctx.beginPath();ctx.moveTo(-38,0);ctx.lineTo(-57,-17);ctx.lineTo(-52,0);ctx.lineTo(-58,17);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(6,8);ctx.lineTo(-6,28);ctx.lineTo(20,12);ctx.fill();ctx.fillStyle='#efffff';ctx.beginPath();ctx.arc(33,-5,2,0,7);ctx.fill()}
+  ctx.restore();
+}
+function garbage(s,o){
+  const [x,y]=inside(s,o.x,o.y);ctx.save();ctx.translate(x,y+Math.sin(t+o.phase)*5);ctx.rotate(Math.sin(t*.5+o.phase)*.4);ctx.globalAlpha=.3+state.trash*.65;ctx.fillStyle=o.kind===0?'#ef7672':o.kind===1?'#ded7b5':'#a4b7bd';if(o.kind===0){ctx.fillRect(-5,-11,10,22);ctx.strokeStyle='#fff9';ctx.strokeRect(-3,-8,6,13)}else if(o.kind===1){ctx.beginPath();ctx.moveTo(-9,-8);ctx.lineTo(9,-4);ctx.lineTo(6,9);ctx.lineTo(-7,7);ctx.closePath();ctx.fill()}else{ctx.strokeStyle='#cadde2';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,8,0,7);ctx.stroke()}ctx.restore();
+}
+function shell(s){
+  const shine=ctx.createRadialGradient(s.x-s.r*.35,s.y-s.r*.4,0,s.x-s.r*.28,s.y-s.r*.32,s.r*1.25);shine.addColorStop(0,'rgba(220,255,255,.42)');shine.addColorStop(.12,'rgba(120,235,250,.05)');shine.addColorStop(.72,'rgba(40,190,220,.03)');shine.addColorStop(1,'rgba(110,235,250,.24)');
+  ctx.fillStyle=shine;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill();ctx.strokeStyle='rgba(163,246,255,.48)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.save();ctx.globalAlpha=.16;ctx.strokeStyle='#c5fbff';for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(s.x,s.y,s.r-i*7,Math.PI*1.08,Math.PI*1.55);ctx.stroke()}ctx.restore();
+}
+function bubbles(s){
+  ctx.strokeStyle='rgba(184,250,255,.38)';creatures.bubbles.forEach(b=>{b.y-=b.s*(state.playing?1:0);if(b.y<-.9)b.y=.9;const [x,y]=inside(s,b.x,b.y);ctx.beginPath();ctx.arc(x,y,b.r,0,7);ctx.stroke()});
+}
+function draw(){
+  const now=performance.now(),dt=Math.min((now-last)/1000,.04);last=now;if(state.playing)t+=dt*(.35+state.speed*1.8)*(1.25-state.chill*.45);
+  bg();const s=sphere();s.x+=(mouseX-W/2)*.018;s.y+=(mouseY-H/2)*.012;
+  ctx.save();ctx.shadowColor=state.purity>.5?'#24dcee':'#b58b62';ctx.shadowBlur=55;ctx.fillStyle='rgba(8,96,112,.2)';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill();ctx.restore();
+  clipSphere(s);drawWater(s);
+  creatures.bubbles.forEach(()=>{});bubbles(s);
+  const fishCount=Math.floor(creatures.fish.length*state.fish);creatures.fish.slice(0,fishCount).forEach((f,i)=>{if(state.playing){f.x+=dt*f.s*(.5+state.current*2);if(f.x>.88)f.x=-.88}fish(s,f,i)});
+  creatures.jelly.slice(0,Math.floor(creatures.jelly.length*state.jellies)).forEach(j=>{if(state.playing){j.y-=dt*.025*(.4+state.current);if(j.y<-.76)j.y=.74}jelly(s,j)});
+  creatures.large.slice(0,Math.ceil(creatures.large.length*state.large)).forEach(o=>{if(state.playing){o.x+=dt*o.s;if(o.x>.72)o.x=-.72}whale(s,o)});
+  creatures.trash.slice(0,Math.floor(creatures.trash.length*state.trash)).forEach(o=>garbage(s,o));
+  ctx.restore();shell(s);
+  requestAnimationFrame(draw);
+}
+addEventListener('pointermove',e=>{mouseX=e.clientX;mouseY=e.clientY});draw();
 const defs=[['depth','海水深度'],['current','洋流強度'],['purity','海洋純淨度'],['jellies','水母數量'],['fish','魚群數量'],['large','大型生物'],['trash','海洋垃圾'],['life','生命力'],['rotX','球體 X 軸'],['rotY','球體 Y 軸'],['zoom','視角距離'],['wave','海浪幅度'],['speed','水流速度'],['light','光線'],['sound','環境音'],['chill','Chill 程度']];
 const controls=document.querySelector('#controls');
 defs.forEach(([key,name],i)=>{const d=document.createElement('div');d.className='control';d.innerHTML='<label><span>'+name+'</span><output>'+Math.round(state[key]*127)+'</output></label><input type="range" min="0" max="127" value="'+Math.round(state[key]*127)+'" data-key="'+key+'"><small>'+(i<8?'SLIDER '+(i+1):'KNOB '+(i-7))+'</small>';controls.append(d)});
-function setValue(key,val,ui=true){state[key]=THREE.MathUtils.clamp(val,0,1);if(ui){const e=document.querySelector('[data-key="'+key+'"]');if(e){e.value=Math.round(val*127);e.parentElement.querySelector('output').textContent=Math.round(val*127)}}updateWorld()}
-function updateWorld(){ocean.scale.y=.55+state.depth*.45;oceanMat.opacity=.2+state.depth*.42;oceanMat.color.setHSL(.52+state.purity*.015,.72,.12+state.purity*.16);creatures.fish.forEach((o,i)=>o.visible=i<state.fish*creatures.fish.length);creatures.jelly.forEach((o,i)=>o.visible=i<state.jellies*creatures.jelly.length);creatures.large.forEach((o,i)=>o.visible=i<Math.ceil(state.large*creatures.large.length));creatures.trash.forEach((o,i)=>o.visible=i<state.trash*creatures.trash.length);sun.intensity=.25+state.light*3.5;camera.position.z=18-state.zoom*7;const health=Math.round(100*(state.purity*.34+(1-state.trash)*.28+state.life*.26+(1-Math.abs(state.current-.4))*.12));document.querySelector('#healthNumber').textContent=health+'%';document.querySelector('#healthBar').style.width=health+'%';document.querySelector('#healthText').textContent=health>75?'穩定':health>45?'失衡':'危急'}
+function setValue(key,val,ui=true){state[key]=Math.max(0,Math.min(1,val));if(ui){const e=document.querySelector('[data-key="'+key+'"]');if(e){e.value=Math.round(val*127);e.parentElement.querySelector('output').textContent=Math.round(val*127)}}updateHealth()}
+function updateHealth(){const h=Math.round(100*(state.purity*.34+(1-state.trash)*.28+state.life*.26+(1-Math.abs(state.current-.4))*.12));document.querySelector('#healthNumber').textContent=h+'%';document.querySelector('#healthBar').style.width=h+'%';document.querySelector('#healthText').textContent=h>75?'穩定':h>45?'失衡':'危急'}
 controls.addEventListener('input',e=>{if(e.target.matches('input'))setValue(e.target.dataset.key,+e.target.value/127)});
-let toastTimer;function toast(icon,msg){const el=document.querySelector('#toast');el.querySelector('span').textContent=icon;el.querySelector('p').textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600)}
-function event(name){const burst=(type,n)=>{for(let i=0;i<n;i++){const o=addLarge(type);o.scale.setScalar(.01);setTimeout(()=>o.scale.setScalar(type==='dolphin'?.55:.85),i*100)}};({whale:()=>{burst('whale',1);toast('🐋','一隻鯨魚從星球深處緩緩游過')},dolphin:()=>{burst('dolphin',5);toast('🐬','海豚群穿越了洋流')},jelly:()=>{setValue('jellies',1);toast('🪼','發光水母正在大量浮起')},turtle:()=>{burst('turtle',1);toast('🐢','海龜回到了乾淨的棲地')},pollution:()=>{setValue('trash',.9);setValue('purity',.25);toast('🗑️','污染升高，海洋生命正在受影響')},current:()=>{setValue('current',1);toast('🌊','強烈洋流席捲整顆星球')},deep:()=>{state.deep=!state.deep;setValue('light',state.deep?.08:.7);toast('🌑',state.deep?'進入深海，只剩生命微光':'返回明亮海面')},clean:()=>{setValue('trash',0);setValue('purity',1);setValue('life',1);toast('✨','海洋完成淨化，生命正在復甦')},play:()=>{state.playing=true;toast('▶','星球開始呼吸')},stop:()=>{state.playing=false;toast('■','海洋慢慢靜止')},record:()=>{setValue('trash',1);setValue('purity',.05);setValue('life',.15);toast('●','人類污染入侵，生態進入危急狀態')}}[name]||(()=>{}))()}
+function toast(icon,msg){const el=document.querySelector('#toast');el.querySelector('span').textContent=icon;el.querySelector('p').textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600)}
+function event(name){const act={whale:()=>{creatures.large[0].x=-.72;setValue('large',1);toast('🐋','鯨魚從透明球深處緩緩游過')},dolphin:()=>{creatures.large[1].x=-.72;setValue('large',1);toast('🐬','海豚快速穿越洋流')},jelly:()=>{setValue('jellies',1);toast('🪼','大量發光水母正在浮起')},turtle:()=>{creatures.large[2].x=-.72;setValue('large',1);toast('🐢','海龜回到乾淨的棲地')},pollution:()=>{setValue('trash',1);setValue('purity',.18);toast('🗑️','垃圾增加，海水開始混濁')},current:()=>{setValue('current',1);setValue('wave',1);toast('🌊','強烈洋流席捲整顆星球')},deep:()=>{state.deep=!state.deep;setValue('light',state.deep?.05:.7);toast('🌑',state.deep?'進入深海微光模式':'返回明亮海面')},clean:()=>{setValue('trash',0);setValue('purity',1);setValue('life',1);toast('✨','污染消退，海洋生命重新復甦')},play:()=>{state.playing=true;toast('▶','星球開始呼吸')},stop:()=>{state.playing=false;toast('■','海洋慢慢靜止')},record:()=>{setValue('trash',1);setValue('purity',.05);setValue('life',.12);toast('●','人類污染入侵，生態進入危急狀態')}};if(act[name])act[name]()}
 document.querySelectorAll('[data-event]').forEach(b=>b.onclick=()=>event(b.dataset.event));
-document.querySelector('#enterBtn').onclick=()=>document.querySelector('#panel').classList.add('open');document.querySelector('#closePanel').onclick=()=>document.querySelector('#panel').classList.remove('open');document.querySelector('#storyBtn').onclick=()=>document.querySelector('#concept').classList.add('open');document.querySelector('#closeStory').onclick=()=>document.querySelector('#concept').classList.remove('open');
+document.querySelector('#enterBtn').onclick=()=>document.querySelector('#panel').classList.add('open');
+document.querySelector('#closePanel').onclick=()=>document.querySelector('#panel').classList.remove('open');
+document.querySelector('#storyBtn').onclick=()=>document.querySelector('#concept').classList.add('open');
+document.querySelector('#closeStory').onclick=()=>document.querySelector('#concept').classList.remove('open');
 const midiBtn=document.querySelector('#midiBtn'),sliderCC=[0,1,2,3,4,5,6,7],knobCC=[16,17,18,19,20,21,22,23],keys=defs.map(x=>x[0]),buttonMap={32:'whale',33:'dolphin',34:'jelly',35:'turtle',48:'pollution',49:'current',50:'deep',51:'clean',41:'play',42:'stop',45:'record'};
-midiBtn.onclick=async()=>{if(!navigator.requestMIDIAccess){toast('⚠️','此瀏覽器不支援 Web MIDI，請使用 Chrome 或 Edge');return}try{const access=await navigator.requestMIDIAccess();const bind=()=>{let n=0;access.inputs.forEach(input=>{input.onmidimessage=onMIDI;n++});midiBtn.classList.toggle('connected',n>0);midiBtn.querySelector('span').textContent=n?'nanoKONTROL2 已連接':'等待 MIDI 裝置';toast(n?'✅':'⚠️',n?'生命控制台已連接':'找不到 MIDI 輸入裝置')};bind();access.onstatechange=bind}catch(e){toast('⚠️','MIDI 權限未開啟')}};
-function onMIDI(e){const [status,cc,value]=e.data;if((status&0xf0)!==0xb0)return;let idx=sliderCC.indexOf(cc);if(idx<0){const k=knobCC.indexOf(cc);if(k>=0)idx=k+8}if(idx>=0)setValue(keys[idx],value/127);if(value>0&&buttonMap[cc])event(buttonMap[cc])}
-addEventListener('keydown',e=>{const map={q:'whale',w:'dolphin',e:'jelly',r:'turtle',a:'pollution',s:'current',d:'deep',f:'clean',' ':'play'};if(map[e.key.toLowerCase()])event(map[e.key.toLowerCase()])});
-let t=0;function animate(){requestAnimationFrame(animate);const dt=.008*(.3+state.speed)*(1.4-state.chill);if(state.playing)t+=dt;world.rotation.y+=(state.rotX-.5)*.007+state.current*.001;world.rotation.x=(state.rotY-.5)*.65;const swim=(arr,mult=1)=>arr.forEach((o,i)=>{if(!o.visible)return;const p=o.userData.phase||0;o.position.x+=dt*(o.userData.s||.08)*mult;o.position.y+=Math.sin(t*3+p)*.0015;if(o.position.x>2.8)o.position.x=-2.8});swim(creatures.fish,2);swim(creatures.large,.7);creatures.jelly.forEach(o=>{o.position.y+=dt*.08;if(o.position.y>2.8)o.position.y=-2.8;o.scale.setScalar(1+Math.sin(t*4+o.userData.phase)*.08)});creatures.trash.forEach(o=>{o.rotation.y+=dt;o.position.y+=Math.sin(t+o.userData.phase)*.0005});shell.scale.setScalar(1+Math.sin(t*2)*state.wave*.006);particles.rotation.y=t*.02;renderer.render(scene,camera)}updateWorld();animate();
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);world.position.x=innerWidth<760?1.1:2.6});if(innerWidth<760)world.position.x=1.1;
+midiBtn.onclick=async()=>{if(!navigator.requestMIDIAccess){toast('⚠️','請使用支援 Web MIDI 的 Chrome 或 Edge');return}try{const access=await navigator.requestMIDIAccess();const bind=()=>{let n=0;access.inputs.forEach(input=>{input.onmidimessage=onMIDI;n++});midiBtn.classList.toggle('connected',n>0);midiBtn.querySelector('span').textContent=n?'nanoKONTROL2 已連接':'等待 MIDI 裝置';toast(n?'✅':'⚠️',n?'生命控制台已連接':'找不到 MIDI 輸入裝置')};bind();access.onstatechange=bind}catch(e){toast('⚠️','MIDI 權限未開啟')}};
+function onMIDI(e){const [status,cc,value]=e.data;if((status&240)!==176)return;let idx=sliderCC.indexOf(cc);if(idx<0){const k=knobCC.indexOf(cc);if(k>=0)idx=k+8}if(idx>=0)setValue(keys[idx],value/127);if(value>0&&buttonMap[cc])event(buttonMap[cc])}
+addEventListener('keydown',e=>{const map={q:'whale',w:'dolphin',e:'jelly',r:'turtle',a:'pollution',s:'current',d:'deep',f:'clean',' ':'play'};if(map[e.key.toLowerCase()])event(map[e.key.toLowerCase()])});updateHealth();
