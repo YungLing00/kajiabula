@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>海的星球｜SEA PLANET</title>
 <meta name="description" content="用你的雙手，感受每一次選擇如何改變一顆海洋。">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=12">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script>
 </head>
 <body>
@@ -24,6 +24,8 @@
 </section>
 <section id="panel" class="panel" aria-label="生命控制台">
 <div class="panel-head"><div><small>LIFE CONTROL CONSOLE</small><h2>生命控制台</h2></div><button id="closePanel">×</button></div>
+<p class="sound-hint">點一下啟動海洋聲景 · 拖曳旋轉 · 點擊掀起水花</p>
+<details class="music-card"><summary>Ocean Eyes · 背景音樂</summary><p id="musicStatus" role="status">正在載入音樂；海洋聲景可獨立使用。</p><div id="youtubePlayer"></div></details>
 <div id="controls" class="controls"></div>
 <div class="events">
 <p>觸發海洋事件</p>
@@ -46,7 +48,5 @@
 </section>
 </main>
 <footer><span>MOVE · LISTEN · OBSERVE · RESTORE</span><span>Web MIDI + Canvas Animation</span></footer>
-<div id="youtubePlayer" aria-hidden="true" style="position:fixed;width:1px;height:1px;left:-10px;bottom:-10px;opacity:.01;pointer-events:none"></div>
-<script src="https://www.youtube.com/iframe_api"></script>
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=12"></script>
 </body></html>
