@@ -1,6 +1,6 @@
 const canvas=document.querySelector('#ocean');
 const ctx=canvas.getContext('2d',{alpha:false});
-const state={depth:.78,current:.35,purity:.78,jellies:.5,fish:.7,large:.75,trash:.18,life:.78,pad:.34,waves:.42,bell:.18,whales:.2,bubblesTrack:.16,currentTrack:.2,deepBass:.14,master:.55,wave:.3,speed:.45,light:.7,zoom:.55,playing:true,deep:false};
+const state={depth:.78,current:.35,purity:.78,jellies:.5,fish:.7,large:.75,trash:.18,life:.78,pad:.34,waves:.42,bell:.18,whales:.2,bubblesTrack:.16,currentTrack:.2,deepBass:.14,master:.55,wave:.3,speed:.45,chill:.7,light:.7,zoom:.55,playing:true,deep:false};
 let W=0,H=0,DPR=1,t=0,last=performance.now(),mouseX=0,mouseY=0,toastTimer;
 const ripples=[];let audio=null,audioPulse=0;
 const creatures={fish:[],jelly:[],trash:[],bubbles:[],large:[]};
