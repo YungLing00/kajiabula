@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>海的星球｜SEA PLANET</title>
+<meta name="description" content="用你的雙手，感受每一次選擇如何改變一顆海洋。">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script>
+</head>
+<body>
+<canvas id="ocean" aria-label="互動式海洋星球"></canvas>
+<div class="grain"></div>
+<header><a class="brand" href="#"><span class="brand-dot"></span><b>SEA PLANET</b><small>海的星球</small></a><button id="midiBtn" class="midi"><i></i><span>連接 nanoKONTROL2</span></button></header>
+<main>
+<section class="hero">
+<p class="eyebrow">AN INTERACTIVE OCEAN ECOSYSTEM</p>
+<h1>你的手，<br>就是影響這顆<br><em>海洋</em>的力量。</h1>
+<p class="intro">控制洋流、光線與生命，觀察人類的每次選擇，如何在一顆微型星球裡留下痕跡。</p>
+<div class="actions"><button id="enterBtn" class="primary">進入控制模式 <span>↘</span></button><button id="storyBtn" class="ghost">閱讀創作概念</button></div>
+</section>
+<section class="status" aria-live="polite">
+<div><span>ECOSYSTEM</span><strong id="healthText">穩定</strong></div>
+<div class="meter"><i id="healthBar"></i></div><b id="healthNumber">78%</b>
+</section>
+<section id="panel" class="panel" aria-label="生命控制台">
+<div class="panel-head"><div><small>LIFE CONTROL CONSOLE</small><h2>生命控制台</h2></div><button id="closePanel">×</button></div>
+<div id="controls" class="controls"></div>
+<div class="events">
+<p>觸發海洋事件</p>
+<div class="event-grid">
+<button data-event="whale">🐋<span>鯨魚出現</span><kbd>S1</kbd></button>
+<button data-event="dolphin">🐬<span>海豚群</span><kbd>S2</kbd></button>
+<button data-event="jelly">🪼<span>水母爆發</span><kbd>S3</kbd></button>
+<button data-event="turtle">🐢<span>海龜出現</span><kbd>S4</kbd></button>
+<button data-event="pollution">🗑️<span>污染事件</span><kbd>M1</kbd></button>
+<button data-event="current">🌊<span>強烈洋流</span><kbd>M2</kbd></button>
+<button data-event="deep">🌑<span>深海模式</span><kbd>M3</kbd></button>
+<button data-event="clean">✨<span>淨化海洋</span><kbd>M4</kbd></button>
+</div>
+<div class="transport"><button data-event="play">▶ PLAY<br><span>讓星球呼吸</span></button><button data-event="stop">■ STOP<br><span>讓海洋靜止</span></button><button class="danger" data-event="record">● REC<br><span>人類污染入侵</span></button></div>
+</div>
+</section>
+<aside id="toast" class="toast"><span>🌊</span><div><b>海洋訊息</b><p>星球正在等待你的選擇</p></div></aside>
+<section id="concept" class="concept">
+<button id="closeStory">×</button><p>WHAT IF...</p><h2>如果海洋是一顆<br>能被人類操控的生命？</h2><div class="concept-copy"><p>在未來的台灣，一顆透明球體濃縮了完整的海洋生態。數位生命以人類行為與環境數據為食，每一次操作都會改變牠們的命運。</p><p>這不是一個單純控制漂亮海洋的作品，而是一段「控制、發現影響、主動恢復平衡」的體驗。</p></div>
+</section>
+</main>
+<footer><span>MOVE · LISTEN · OBSERVE · RESTORE</span><span>Web MIDI + Three.js</span></footer>
+<script type="module" src="app.js"></script>
+</body></html>
